@@ -1,0 +1,10 @@
+chromium \
+    --no-first-run \
+    --disable \
+    --disable-translate \
+    --disable-infobars \
+    --disable-suggestions-service \
+    --disable-save-password-bubble \
+    --start-maximized \
+    --kiosk "{{ kiosk_site }}" &
+onboard &

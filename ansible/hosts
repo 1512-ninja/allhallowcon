@@ -1,0 +1,4 @@
+; Description: Hosts file for Ansible
+
+[photobooth]
+192.168.1.111
