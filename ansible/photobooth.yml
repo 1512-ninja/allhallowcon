@@ -187,10 +187,8 @@
         name: "{{ item }}"
         state: present
       with_items:
-        - xorg
+        - task-xfce-desktop
         - chromium
-        - openbox
-        - lightdm
     - name: edit lightdm config script to enable autologin
       become: yes
       ansible.builtin.copy:
@@ -201,26 +199,54 @@
         mode: 0644
       notify:
         - reboot
-    - name: create parent directory for autostart script
+    # - name: create parent directory for autostart script
+    #   become: yes
+    #   file:
+    #     path: /home/kiosk/.config/openbox
+    #     state: directory
+    #     owner: kiosk
+    #     group: kiosk
+    - name: create parent directory for xfce autostart script
       become: yes
       file:
-        path: /home/kiosk/.config/openbox
+        path: /home/kiosk/.config/autostart
         state: directory
         owner: kiosk
         group: kiosk
-    - name: create kiosk user autostart script
+    # - name: create kiosk user autostart script
+    #   become: yes
+    #   template:
+    #     src: autostart.j2
+    #     dest: /home/kiosk/.config/openbox/autostart
+    #     owner: kiosk
+    #     group: kiosk
+    #     mode: 0644
+    #   vars:
+    #     kiosk_site: "http://localhost"
+    #   notify:
+    #     - reboot
+    - name: drop autostart script
       become: yes
       template:
-        src: autostart.j2
-        dest: /home/kiosk/.config/openbox/autostart
+        src: autostart.sh.j2
+        dest: /home/kiosk/autostart.sh
         owner: kiosk
         group: kiosk
-        mode: 0644
+        mode: 0755
       vars:
         kiosk_site: "http://localhost"
+      notify:
+        - reboot
+    - name: create kiosk xfce user autostart config
+      become: yes
+      copy:
+        src: photobooth.desktop
+        dest: /home/kiosk/.config/autostart/photobooth.desktop
       notify:
         - reboot
   handlers:
     - name: reboot
       become: yes
       ansible.builtin.reboot: 
+
+# TODO: I did manual configuration to make the onscreen keyboard show up in Xfce
