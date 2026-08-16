@@ -1,0 +1,252 @@
+---
+
+- name: convenience stuff that I like
+  hosts: all
+  tasks:
+    - name: install packages I want
+      become: yes
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - sudo
+        - git
+        - whois
+        - vim
+        - direnv
+        - screen
+        - speedometer
+        - byobu
+        - build-essential
+        - make
+        - curl
+        - software-properties-common
+        - python3-launchpadlib
+        - bash-completion
+        - wget
+        - poppler-utils
+        - net-tools
+        - htop
+
+- name: pre-photobooth dependencies
+  hosts: all
+  tasks:
+    - name: make sure nginx is not installed
+      become: yes
+      apt:
+        name: nginx
+        state: absent
+    - name: install packages
+      become: yes
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - curl
+        - gcc
+        - g++
+        - make
+        - git
+        - ffmpeg
+        - gphoto2
+        - libimage-exiftool-perl
+        - php-xml
+        - php-gd
+        - php-zip
+        - php-mbstring
+        - python3
+        - python3-gphoto2
+        - python3-psutil
+        - python3-zmq
+        - python3-apt
+        - rsync
+        - udisks2
+        - v4l2loopback-dkms
+        - v4l-utils
+        - php-fpm
+        - libapache2-mod-php
+        - apt-transport-https
+        - ca-certificates
+        - gnupg
+        - acl
+        - onboard
+        - cups
+    # - name: install nodejs apt key
+    #   become: yes
+    #   apt_key:
+    #     url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
+    # - name: configure nodejs repository
+    #   # TODO: trigger reinstall if the repository changes
+    #   become: yes
+    #   apt_repository:
+    #     repo: deb https://deb.nodesource.com/node_20.x nodistro main
+    #     state: present
+    - name: configure nodejs repository
+      become: yes
+      deb822_repository:
+        name: nodesource_20_x
+        uris: https://deb.nodesource.com/node_20.x
+        suites: nodistro
+        components: main
+        signed_by: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+        state: present
+    - name: install nodejs
+      become: yes
+      apt:
+        name: nodejs
+        state: present
+        update_cache: true
+
+- name: install photobooth
+  hosts: all
+  tasks:
+    - name: remove /var/www/html if it contains index.html
+      become: yes
+      ansible.builtin.command:
+        cmd: rm -rf /var/www/html
+        removes: /var/www/html/index.html
+    # - name: make sure gvfs-gphoto2-volume-monitor isn't executable
+    #   become: yes
+    #   file:
+    #     path: /usr/lib/gvfs/gvfs-gphoto2-volume-monitor
+    #     mode: 0644
+    #   notify:
+    #     - reboot
+    - name: make sure www-data owns /var/www
+      become: yes
+      file:
+        path: /var/www
+        recurse: true
+        owner: www-data
+        group: www-data
+        state: directory
+    - name: add www-data to the needed groups
+      become: yes
+      user:
+        name: www-data
+        groups: 
+          - plugdev
+          - video
+          - lp
+        append: yes
+      notify:
+        - reboot
+    - name: clone photobooth as user www-data and trigger a reboot
+      become: true
+      become_user: www-data
+      git:
+        repo: https://github.com/PhotoboothProject/photobooth
+        dest: /var/www/html
+        track_submodules: true
+      notify:
+        - run npm install and npm build run
+        - reboot
+  handlers:
+    - name: run npm install and npm build run
+      become: yes
+      become_user: www-data
+      shell: 
+        cmd: npm install && npm run build
+        chdir: /var/www/html
+    - name: reboot
+      become: yes
+      ansible.builtin.reboot: 
+
+# TODO:
+# - name: install liveview things
+#   hosts: all
+#   tasks:
+#     - name: liveview dependencies
+#       apt:
+#         name: "{{ item }}"
+#         state: present
+#       with_items:
+#         - ffmpeg
+#         - v4l2loopback-dkms
+#         - v4l-utils
+#         - python3
+#         - python3-gphoto2
+#         - python3-psutil
+#         - python3-zmq
+#     - name: check if gphoto-python exists
+
+# Based on https://www.willhaley.com/blog/debian-fullscreen-gui-kiosk/
+- name: set up the kiosk
+  hosts: all
+  tasks:
+    - name: create kiosk user
+      become: yes
+      user:
+        name: kiosk
+        shell: /bin/bash
+        home: /home/kiosk
+        createhome: yes
+    - name: install required kiosk packages
+      become: yes
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - task-xfce-desktop
+        - chromium
+    - name: edit lightdm config script to enable autologin
+      become: yes
+      ansible.builtin.copy:
+        src: lightdm.conf
+        dest: /etc/lightdm/lightdm.conf
+        owner: root
+        group: root
+        mode: 0644
+      notify:
+        - reboot
+    # - name: create parent directory for autostart script
+    #   become: yes
+    #   file:
+    #     path: /home/kiosk/.config/openbox
+    #     state: directory
+    #     owner: kiosk
+    #     group: kiosk
+    - name: create parent directory for xfce autostart script
+      become: yes
+      file:
+        path: /home/kiosk/.config/autostart
+        state: directory
+        owner: kiosk
+        group: kiosk
+    # - name: create kiosk user autostart script
+    #   become: yes
+    #   template:
+    #     src: autostart.j2
+    #     dest: /home/kiosk/.config/openbox/autostart
+    #     owner: kiosk
+    #     group: kiosk
+    #     mode: 0644
+    #   vars:
+    #     kiosk_site: "http://localhost"
+    #   notify:
+    #     - reboot
+    - name: drop autostart script
+      become: yes
+      template:
+        src: autostart.sh.j2
+        dest: /home/kiosk/autostart.sh
+        owner: kiosk
+        group: kiosk
+        mode: 0755
+      vars:
+        kiosk_site: "http://localhost"
+      notify:
+        - reboot
+    - name: create kiosk xfce user autostart config
+      become: yes
+      copy:
+        src: photobooth.desktop
+        dest: /home/kiosk/.config/autostart/photobooth.desktop
+      notify:
+        - reboot
+  handlers:
+    - name: reboot
+      become: yes
+      ansible.builtin.reboot: 
+
+# TODO: I did manual configuration to make the onscreen keyboard show up in Xfce
