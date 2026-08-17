@@ -20,7 +20,7 @@ The playbook reboots the host when the desktop or kiosk configuration changes.
 ## What lives elsewhere
 
 - **DNS and the `allhallowcon.com` registration** are managed in
-  [1512-ninja/events](https://github.com/1512-ninja/events) (`bootstrap/`), which owns the
+  [1512-link/events](https://github.com/1512-link/events) (`bootstrap/`), which owns the
   hosted zone and the registrar's name servers. Nothing in this repo touches AWS.
 - **Event sites** are built with
   [duplico/partyplanner](https://github.com/duplico/partyplanner) and deployed from that
